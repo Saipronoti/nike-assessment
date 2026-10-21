@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.Set;
 import jakarta.validation.Validator;
+import jakarta.validation.ConstraintViolation;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -93,11 +94,15 @@ public class ProductController {
         if (!unknownFields.isEmpty()) {
             throw new InvalidProductRequestException("request", "contains unknown fields: " + unknownFields);
         }
+        body.fields().forEachRemaining(entry -> {
+            if (entry.getValue().isNull()) {
+                throw new InvalidProductRequestException(entry.getKey(), "must not be null when supplied");
+            }
+        });
         try {
             ProductPatchRequest request = objectMapper.treeToValue(body, ProductPatchRequest.class);
-            var violations = validator.validate(request);
-            if (!violations.isEmpty()) {
-                throw new InvalidProductRequestException("request", violations.iterator().next().getMessage());
+            for (ConstraintViolation<ProductPatchRequest> violation : validator.validate(request)) {
+                throw new InvalidProductRequestException(violation.getPropertyPath().toString(), violation.getMessage());
             }
             return service.patch(id, request, body);
         } catch (IllegalArgumentException exception) {

@@ -2,6 +2,8 @@ package com.example.catalog.product;
 
 import java.math.BigDecimal;
 import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validator;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -13,9 +15,11 @@ import org.springframework.web.server.ResponseStatusException;
 @Transactional
 public class ProductService {
     private final ProductRepository repository;
+    private final Validator validator;
 
-    public ProductService(ProductRepository repository) {
+    public ProductService(ProductRepository repository, Validator validator) {
         this.repository = repository;
+        this.validator = validator;
     }
 
     public ProductResponse create(ProductRequest request) {
@@ -70,22 +74,9 @@ public class ProductService {
     }
 
     private void validateProduct(Product product) {
-        if (product.getName() == null || product.getName().isBlank() || product.getName().length() > 160) {
-            throw new InvalidProductRequestException("name", "must contain 1 to 160 non-blank characters");
-        }
-        if (product.getDescription() == null || product.getDescription().isBlank()
-                || product.getDescription().length() > 4000) {
-            throw new InvalidProductRequestException("description", "must contain 1 to 4000 non-blank characters");
-        }
-        if (product.getCategory() == null || product.getCategory().isBlank() || product.getCategory().length() > 80) {
-            throw new InvalidProductRequestException("category", "must contain 1 to 80 non-blank characters");
-        }
-        if (product.getPrice() == null || product.getPrice().signum() < 0
-                || product.getPrice().precision() > 12 || product.getPrice().scale() > 2) {
-            throw new InvalidProductRequestException("price", "must be non-negative with at most 10 integer and 2 decimal digits");
-        }
-        if (product.getStockQuantity() == null || product.getStockQuantity() < 0) {
-            throw new InvalidProductRequestException("stockQuantity", "must be zero or greater");
+        for (ConstraintViolation<Product> violation : validator.validate(product)) {
+            throw new InvalidProductRequestException(violation.getPropertyPath().toString(),
+                    violation.getMessage());
         }
     }
 
