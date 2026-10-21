@@ -1,6 +1,7 @@
 package com.example.catalog.product;
 
 import java.math.BigDecimal;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -39,6 +40,53 @@ public class ProductService {
         product.update(request.name().trim(), request.description().trim(), request.category().trim(),
                 request.price(), request.stockQuantity());
         return ProductResponse.from(repository.save(product));
+    }
+
+    public ProductResponse patch(Long id, ProductPatchRequest request, JsonNode rawFields) {
+        Product product = find(id);
+        rejectExplicitNulls(rawFields);
+
+        String name = trimIfPresent(request.name());
+        String description = trimIfPresent(request.description());
+        String category = trimIfPresent(request.category());
+        product.applyPatch(name, description, category, request.price(), request.stockQuantity());
+        validateProduct(product);
+        return ProductResponse.from(repository.save(product));
+    }
+
+    private void rejectExplicitNulls(JsonNode rawFields) {
+        rawFields.fields().forEachRemaining(entry -> {
+            if (entry.getValue().isNull()) {
+                throw new InvalidProductRequestException(entry.getKey(), "must not be null when supplied");
+            }
+        });
+        if (rawFields.isEmpty()) {
+            throw new InvalidProductRequestException("request", "must contain at least one field");
+        }
+    }
+
+    private String trimIfPresent(String value) {
+        return value == null ? null : value.trim();
+    }
+
+    private void validateProduct(Product product) {
+        if (product.getName() == null || product.getName().isBlank() || product.getName().length() > 160) {
+            throw new InvalidProductRequestException("name", "must contain 1 to 160 non-blank characters");
+        }
+        if (product.getDescription() == null || product.getDescription().isBlank()
+                || product.getDescription().length() > 4000) {
+            throw new InvalidProductRequestException("description", "must contain 1 to 4000 non-blank characters");
+        }
+        if (product.getCategory() == null || product.getCategory().isBlank() || product.getCategory().length() > 80) {
+            throw new InvalidProductRequestException("category", "must contain 1 to 80 non-blank characters");
+        }
+        if (product.getPrice() == null || product.getPrice().signum() < 0
+                || product.getPrice().precision() > 12 || product.getPrice().scale() > 2) {
+            throw new InvalidProductRequestException("price", "must be non-negative with at most 10 integer and 2 decimal digits");
+        }
+        if (product.getStockQuantity() == null || product.getStockQuantity() < 0) {
+            throw new InvalidProductRequestException("stockQuantity", "must be zero or greater");
+        }
     }
 
     public void delete(Long id) {

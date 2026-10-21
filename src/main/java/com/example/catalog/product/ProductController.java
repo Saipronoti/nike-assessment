@@ -1,7 +1,12 @@
 package com.example.catalog.product;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
+import java.util.HashSet;
+import java.util.Set;
+import jakarta.validation.Validator;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -12,6 +17,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -25,10 +31,15 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/v1/products")
 public class ProductController {
     private static final int MAX_PAGE_SIZE = 100;
+    private static final Set<String> PATCH_FIELDS = Set.of("name", "description", "category", "price", "stockQuantity");
     private final ProductService service;
+    private final ObjectMapper objectMapper;
+    private final Validator validator;
 
-    public ProductController(ProductService service) {
+    public ProductController(ProductService service, ObjectMapper objectMapper, Validator validator) {
         this.service = service;
+        this.objectMapper = objectMapper;
+        this.validator = validator;
     }
 
     @PostMapping
@@ -68,6 +79,32 @@ public class ProductController {
     @PutMapping("/{id}")
     public ProductResponse update(@PathVariable Long id, @Valid @RequestBody ProductRequest request) {
         return service.update(id, request);
+    }
+
+    @PatchMapping("/{id}")
+    public ProductResponse patch(@PathVariable Long id, @RequestBody JsonNode body) {
+        if (!body.isObject() || body.isEmpty()) {
+            throw new InvalidProductRequestException("request", "must be a non-empty JSON object");
+        }
+        Set<String> unknownFields = new HashSet<>();
+        body.fieldNames().forEachRemaining(field -> {
+            if (!PATCH_FIELDS.contains(field)) unknownFields.add(field);
+        });
+        if (!unknownFields.isEmpty()) {
+            throw new InvalidProductRequestException("request", "contains unknown fields: " + unknownFields);
+        }
+        try {
+            ProductPatchRequest request = objectMapper.treeToValue(body, ProductPatchRequest.class);
+            var violations = validator.validate(request);
+            if (!violations.isEmpty()) {
+                throw new InvalidProductRequestException("request", violations.iterator().next().getMessage());
+            }
+            return service.patch(id, request, body);
+        } catch (IllegalArgumentException exception) {
+            throw new InvalidProductRequestException("request", "contains an invalid value or unknown field");
+        } catch (com.fasterxml.jackson.core.JsonProcessingException exception) {
+            throw new InvalidProductRequestException("request", "contains an invalid value");
+        }
     }
 
     @DeleteMapping("/{id}")

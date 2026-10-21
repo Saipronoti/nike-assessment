@@ -70,10 +70,14 @@ public class Product {
     public Long getVersion() { return version; }
 
     public void update(String name, String description, String category, BigDecimal price, Integer stockQuantity) {
-        this.name = name;
-        this.description = description;
-        this.category = category;
-        this.price = price;
-        this.stockQuantity = stockQuantity;
+        applyPatch(name, description, category, price, stockQuantity);
+    }
+
+    public void applyPatch(String name, String description, String category, BigDecimal price, Integer stockQuantity) {
+        if (name != null) this.name = name;
+        if (description != null) this.description = description;
+        if (category != null) this.category = category;
+        if (price != null) this.price = price;
+        if (stockQuantity != null) this.stockQuantity = stockQuantity;
     }
 }
