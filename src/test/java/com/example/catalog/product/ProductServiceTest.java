@@ -3,6 +3,7 @@ package com.example.catalog.product;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -17,6 +18,7 @@ import org.mockito.Mockito;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -75,14 +77,14 @@ class ProductServiceTest {
     @Test
     void listNormalizesBlankCategoryAndMapsPage() {
         var pageable = PageRequest.of(0, 10, Sort.by("id"));
-        when(repository.search(null, null, null, pageable))
+        when(repository.findAll(any(Specification.class), eq(pageable)))
                 .thenReturn(new PageImpl<>(List.of(product()), pageable, 1));
 
         var result = service.list("  ", null, null, pageable);
 
         assertThat(result.getContent()).hasSize(1);
         assertThat(result.getContent().get(0).name()).isEqualTo("Runner");
-        verify(repository).search(null, null, null, pageable);
+        verify(repository).findAll(any(Specification.class), eq(pageable));
     }
 
     @Test

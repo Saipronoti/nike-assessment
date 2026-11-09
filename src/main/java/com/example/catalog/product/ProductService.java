@@ -35,8 +35,8 @@ public class ProductService {
 
     @Transactional(readOnly = true)
     public Page<ProductResponse> list(String category, BigDecimal minPrice, BigDecimal maxPrice, Pageable pageable) {
-        return repository.search(category == null || category.isBlank() ? null : category.trim(),
-                minPrice, maxPrice, pageable).map(ProductResponse::from);
+        return repository.findAll(ProductSpecifications.withFilters(category, minPrice, maxPrice), pageable)
+                .map(ProductResponse::from);
     }
 
     public ProductResponse update(Long id, ProductRequest request) {
